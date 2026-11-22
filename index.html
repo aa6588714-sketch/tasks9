@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="نظام تقارير المهام اليومية - حساب تلقائي مع الحفظ والتصدير إلى PDF و Excel ورسالة نصية" />
+  <title>نظام تقارير المهام اليومية</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231449c7'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-size='34'%3E%F0%9F%93%8B%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- مكتبة Excel الاختيارية عند توفر الإنترنت (مع مولّد Excel و PDF مدمجين يعملان بدون إنترنت) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #1449c7;
+      --primary-dark: #0f3aa3;
+      --bg: #f3f5f8;
+      --card-bg: #ffffff;
+      --subcard-bg: #f4f5f7;
+      --border: #e5e7eb;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --green: #0f7640;
+      --red: #dc2626;
+      --amber: #d97706;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Cairo', Tahoma, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 16px 12px 40px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* البطاقة العلوية الزرقاء */
+    .header-card {
+      background: linear-gradient(135deg, #1650d8, #1042b8);
+      color: #ffffff;
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 8px 20px rgba(20, 73, 199, 0.22);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .header-top-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .field-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1 1 auto;
+    }
+
+    .field-inline label {
+      font-size: 14px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .header-input,
+    .header-select {
+      background: #ffffff;
+      color: var(--text);
+      border: none;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 14px;
+      font-weight: 600;
+      outline: none;
+      width: 100%;
+      min-width: 110px;
+      transition: box-shadow 0.2s;
+    }
+
+    .header-input:focus,
+    .header-select:focus {
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
+    }
+
+    .employee-input {
+      width: 100%;
+      background: #ffffff;
+      color: var(--text);
+      border: none;
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 15px;
+      font-weight: 600;
+      outline: none;
+    }
+
+    .employee-input::placeholder {
+      color: #9ca3af;
+      font-weight: 400;
+    }
+
+    .actions-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .action-btn {
+      background: #ffffff;
+      color: #111827;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.12s, background-color 0.2s;
+    }
+
+    .action-btn:hover {
+      background: #f3f4f6;
+      transform: translateY(-1px);
+    }
+
+    .action-btn:active {
+      transform: translateY(0);
+    }
+
+    /* شريط الحفظ والأرشيف */
+    .status-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 2px 4px;
+    }
+
+    .status-left,
+    .status-right {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .save-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #e6f4ea;
+      color: #137333;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .bar-btn {
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: #374151;
+      padding: 6px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .bar-btn.archive-save {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: var(--primary);
+    }
+
+    .bar-btn.archive-save:hover {
+      background: #dbeafe;
+    }
+
+    .bar-btn.archive-open:hover {
+      background: #f3f4f6;
+    }
+
+    .bar-btn.reset-btn:hover {
+      background: #fee2e2;
+      color: #b91c1c;
+      border-color: #fca5a5;
+    }
+
+    /* تنبيه وضع الدمج */
+    .merged-banner {
+      display: none;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .merged-banner.show {
+      display: flex;
+    }
+
+    .merged-quick-btns {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .quick-shift-btn {
+      background: #ffffff;
+      border: 1px solid #93c5fd;
+      color: var(--primary);
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .quick-shift-btn:hover {
+      background: #dbeafe;
+    }
+
+    /* بطاقات المهام */
+    .task-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    }
+
+    .task-header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 14px;
+    }
+
+    .task-title {
+      font-size: 18px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #111827;
+    }
+
+    .task-total {
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .task-total span {
+      color: #111827;
+      font-weight: 800;
+      font-size: 16px;
+    }
+
+    .subcards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .subcard {
+      background: var(--subcard-bg);
+      border-radius: 12px;
+      padding: 10px 10px 12px;
+      border-top: 4px solid transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .subcard.done { border-top-color: var(--green); }
+    .subcard.canceled { border-top-color: var(--red); }
+    .subcard.postponed { border-top-color: var(--amber); }
+
+    .subcard-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #4b5563;
+    }
+
+    .num-input {
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 8px 10px;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: #111827;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .num-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(20, 73, 199, 0.12);
+    }
+
+    .num-input[readonly] {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: #1e3a8a;
+      cursor: not-allowed;
+    }
+
+    .single-input-box {
+      background: var(--subcard-bg);
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .single-input-box .num-input {
+      background: #f9fafb;
+    }
+
+    .single-input-box .num-input[readonly] {
+      background: #eff6ff;
+    }
+
+    /* بطاقة الملخص الإجمالي */
+    .summary-card {
+      background: #ffffff;
+      border: 2px solid #dbeafe;
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 4px 12px rgba(20, 73, 199, 0.06);
+    }
+
+    .summary-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .grand-total-pill {
+      background: var(--primary);
+      color: #ffffff;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .summary-item {
+      background: var(--subcard-bg);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .summary-item .label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .summary-item .val {
+      font-size: 18px;
+      font-weight: 800;
+      margin-top: 2px;
+    }
+
+    .shift-breakdown-bar {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px dashed #d1d5db;
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #4b5563;
+    }
+
+    /* النوافذ المنبثقة */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 1000;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: #ffffff;
+      border-radius: 16px;
+      max-width: 580px;
+      width: 100%;
+      max-height: 90vh;
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 800;
+      font-size: 17px;
+    }
+
+    .close-modal {
+      background: #f3f4f6;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .text-preview {
+      width: 100%;
+      min-height: 270px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 14px;
+      background: #f9fafb;
+      resize: vertical;
+      outline: none;
+      line-height: 1.7;
+    }
+
+    .modal-actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .modal-btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #ffffff;
+    }
+
+    .btn-copy { background: var(--primary); }
+    .btn-whatsapp { background: #16a34a; }
+    .btn-txt { background: #4b5563; }
+
+    /* أرشيف التقارير */
+    .archive-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .archive-search {
+      flex: 1 1 180px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .archive-search:focus {
+      border-color: var(--primary);
+    }
+
+    .archive-list {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 55vh;
+      padding-left: 4px;
+    }
+
+    .archive-item {
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .archive-item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .archive-meta {
+      font-size: 14px;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .archive-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .archive-badge {
+      background: #dbeafe;
+      color: var(--primary);
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .archive-item-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .mini-btn {
+      border: none;
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .mini-load { background: var(--primary); color: #fff; }
+    .mini-pdf { background: #dc2626; color: #fff; }
+    .mini-excel { background: #047857; color: #fff; }
+    .mini-text { background: #e5e7eb; color: #111827; }
+    .mini-del { background: #fee2e2; color: #b91c1c; }
+
+    .empty-archive {
+      text-align: center;
+      padding: 28px 12px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 600px) {
+      .subcards-grid {
+        grid-template-columns: 1fr;
+      }
+      .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .modal-actions {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- البطاقة العلوية -->
+    <header class="header-card">
+      <div class="header-top-row">
+        <div class="field-inline">
+          <label for="reportDate">اختر التاريخ</label>
+          <input type="date" id="reportDate" class="header-input" />
+        </div>
+
+        <div class="field-inline">
+          <label for="reportDay">اليوم</label>
+          <select id="reportDay" class="header-select">
+            <option value="الأحد">الأحد</option>
+            <option value="الإثنين">الإثنين</option>
+            <option value="الثلاثاء">الثلاثاء</option>
+            <option value="الأربعاء">الأربعاء</option>
+            <option value="الخميس">الخميس</option>
+            <option value="الجمعة">الجمعة</option>
+            <option value="السبت">السبت</option>
+          </select>
+        </div>
+
+        <div class="field-inline">
+          <label for="reportShift">الفترة</label>
+          <select id="reportShift" class="header-select">
+            <option value="صباحي">صباحي</option>
+            <option value="مسائي">مسائي</option>
+            <option value="صباحي مع مسائي">صباحي مع مسائي</option>
+          </select>
+        </div>
+      </div>
+
+      <input
+        type="text"
+        id="employeeName"
+        class="employee-input"
+        placeholder="اسم الموظف"
+      />
+
+      <div class="actions-row">
+        <button type="button" class="action-btn" onclick="saveAndExportPDF()">
+          <span>⬇️</span> PDF
+        </button>
+        <button type="button" class="action-btn" onclick="openTextModal()">
+          <span>📝</span> نصية
+        </button>
+        <button type="button" class="action-btn" onclick="saveAndExportExcel()">
+          <span>📊</span> حفظ Excel
+        </button>
+      </div>
+    </header>
+
+    <!-- شريط حالة الحفظ والأرشيف -->
+    <div class="status-bar">
+      <div class="status-left">
+        <span class="save-badge" id="saveStatus">💾 محفوظ تلقائياً</span>
+      </div>
+      <div class="status-right">
+        <button type="button" class="bar-btn archive-save" onclick="saveToArchive()">📥 حفظ في الأرشيف</button>
+        <button type="button" class="bar-btn archive-open" onclick="openArchiveModal()">
+          📚 الأرشيف (<span id="archiveCount">0</span>)
+        </button>
+        <button type="button" class="bar-btn reset-btn" onclick="resetAll()">🗑️ تصفير</button>
+      </div>
+    </div>
+
+    <!-- تنبيه وضع الدمج (يظهر عند اختيار صباحي مع مسائي) -->
+    <div class="merged-banner" id="mergedBanner">
+      <span>🔗 وضع التقرير المدمج: الأرقام المعروضة هي مجموع (صباحي + مسائي) تلقائياً.</span>
+      <div class="merged-quick-btns">
+        <button type="button" class="quick-shift-btn" onclick="switchShift('صباحي')">☀️ تعديل الصباحي</button>
+        <button type="button" class="quick-shift-btn" onclick="switchShift('مسائي')">🌆 تعديل المسائي</button>
+      </div>
+    </div>
+
+    <!-- 1. مهام الصيانة -->
+    <section class="task-card" data-section="maintenance">
+      <div class="task-header">
+        <div class="task-title">🔧 مهام الصيانة</div>
+        <div class="task-total">العدد الكلي: <span id="total-maintenance">0</span></div>
+      </div>
+      <div class="subcards-grid">
+        <div class="subcard done">
+          <div class="subcard-label">منجزة</div>
+          <input type="number" min="0" value="0" class="num-input task-input" data-group="maintenance" data-type="done" />
+        </div>
+        <div class="subcard canceled">
+          <div class="subcard-label">ملغية</div>
+          <input type="number" min="0" value="0" class="num-input task-input" data-group="maintenance" data-type="canceled" />
+        </div>
+        <div class="subcard postponed">
+          <div class="subcard-label">مؤجلة</div>
+          <input type="number" min="0" value="0" class="num-input task-input" data-group="maintenance" data-type="postponed" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. مهام النصب -->
+    <section class="task-card" data-section="install">
+      <div class="task-header">
+        <div class="task-title">🏗️ مهام النصب</div>
+        <div class="task-total">العدد الكلي: <span id="total-install">0</span></div>
+      </div>
+      <div class="subcards-grid">
+        <div class="subcard done">
+          <div class="subcard-label">منجزة</div>
+          <input type="number" min="0" value="0" class="num-input task-input" data-group="install" data-type="done" />
+        </div>
+        <div class="subcard canceled">
+          <div class="subcard-label">ملغية</div>
+          <input type="number" min="0" value="0" class="num-input task-input" data-group="install" data-type="canceled" />
+        </div>
+        <div class="subcard postponed">
+          <div class="subcard-label">مؤجلة</div>
+          <input type="number" min="0" value="0" class="num-input task-input" data-group="install" data-type="postponed" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. مهام طلبات التجديد -->
+    <section class="task-card" data-section="renewal">
+      <div class="task-header">
+        <div class="task-title">🔄 مهام طلبات التجديد</div>
+        <div class="task-total">العدد الكلي: <span id="total-renewal">0</span></div>
+      </div>
+      <div class="subcards-grid">
+        <div class="subcard done">
+          <div class="subcard-label">منجزة</div>
+          <input type="number" min="0" value="0" class="num-input task-input" data-group="renewal" data-type="done" />
+        </div>
+        <div class="subcard canceled">
+          <div class="subcard-label">ملغية</div>
+          <input type="number" min="0" value="0" class="num-input task-input" data-group="renewal" data-type="canceled" />
+        </div>
+        <div class="subcard postponed">
+          <div class="subcard-label">مؤجلة</div>
+          <input type="number" min="0" value="0" class="num-input task-input" data-group="renewal" data-type="postponed" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. مهام الجودة -->
+    <section class="task-card">
+      <div class="task-header">
+        <div class="task-title">✅ مهام الجودة</div>
+        <div class="task-total">العدد الكلي: <span id="total-quality">0</span></div>
+      </div>
+      <div class="single-input-box">
+        <input type="number" min="0" value="0" id="input-quality" class="num-input single-task-input" />
+      </div>
+    </section>
+
+    <!-- 5. مهام التصفية -->
+    <section class="task-card">
+      <div class="task-header">
+        <div class="task-title">📦 مهام التصفية</div>
+        <div class="task-total">العدد الكلي: <span id="total-clearance">0</span></div>
+      </div>
+      <div class="single-input-box">
+        <input type="number" min="0" value="0" id="input-clearance" class="num-input single-task-input" />
+      </div>
+    </section>
+
+    <!-- بطاقة المجموع الإجمالي العام -->
+    <section class="summary-card">
+      <div class="summary-title">
+        <span>📊 الإجمالي العام لجميع المهام</span>
+        <span class="grand-total-pill">المجموع الكلي: <span id="grand-total">0</span></span>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="label">إجمالي المنجزة</div>
+          <div class="val" style="color: var(--green);" id="sum-done">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="label">إجمالي الملغية</div>
+          <div class="val" style="color: var(--red);" id="sum-canceled">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="label">إجمالي المؤجلة</div>
+          <div class="val" style="color: var(--amber);" id="sum-postponed">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="label">الجودة + التصفية</div>
+          <div class="val" style="color: var(--primary);" id="sum-other">0</div>
+        </div>
+      </div>
+      <div class="shift-breakdown-bar">
+        <span>☀️ إجمالي الصباحي: <strong id="morning-grand">0</strong></span>
+        <span>🌆 إجمالي المسائي: <strong id="evening-grand">0</strong></span>
+        <span>🔗 المجموع المدمج (الكل): <strong id="combined-grand">0</strong></span>
+      </div>
+    </section>
+  </div>
+
+  <!-- نافذة الرسالة النصية -->
+  <div class="modal-overlay" id="textModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span>📝 الرسالة النصية للتقرير</span>
+        <button class="close-modal" onclick="closeTextModal()">×</button>
+      </div>
+      <textarea id="textReportPreview" class="text-preview" readonly></textarea>
+      <div class="modal-actions">
+        <button class="modal-btn btn-copy" onclick="copyTextReport()">📋 نسخ النص</button>
+        <button class="modal-btn btn-whatsapp" onclick="sendWhatsApp()">💬 إرسال واتساب</button>
+        <button class="modal-btn btn-txt" onclick="downloadTxt()">⬇️ تنزيل TXT</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- نافذة الأرشيف (السجل التاريخي) -->
+  <div class="modal-overlay" id="archiveModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span>📚 سجل التقارير المحفوظة (الأرشيف)</span>
+        <button class="close-modal" onclick="closeArchiveModal()">×</button>
+      </div>
+      <div class="archive-controls">
+        <input
+          type="text"
+          id="archiveSearch"
+          class="archive-search"
+          placeholder="ابحث باسم الموظف أو التاريخ..."
+          oninput="renderArchiveList()"
+        />
+        <button type="button" class="bar-btn archive-save" onclick="exportAllArchiveExcel()">
+          📊 حفظ الأرشيف كـ Excel
+        </button>
+      </div>
+      <div class="archive-list" id="archiveList"></div>
+    </div>
+  </div>
+
+  <script>
+    const DRAFT_KEY = 'tasks_dashboard_data_v3';
+    const ARCHIVE_KEY = 'tasks_dashboard_archive_v2';
+    const arabicDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+
+    const dateEl = document.getElementById('reportDate');
+    const dayEl = document.getElementById('reportDay');
+    const shiftEl = document.getElementById('reportShift');
+    const empEl = document.getElementById('employeeName');
+    const qualityEl = document.getElementById('input-quality');
+    const clearanceEl = document.getElementById('input-clearance');
+    const saveBadge = document.getElementById('saveStatus');
+    const mergedBanner = document.getElementById('mergedBanner');
+
+    function createEmptyShiftData() {
+      return {
+        maintenance: { done: 0, canceled: 0, postponed: 0 },
+        install: { done: 0, canceled: 0, postponed: 0 },
+        renewal: { done: 0, canceled: 0, postponed: 0 },
+        quality: 0,
+        clearance: 0
+      };
+    }
+
+    let shiftsStore = {
+      'صباحي': createEmptyShiftData(),
+      'مسائي': createEmptyShiftData()
+    };
+
+    function toNum(val) {
+      const n = parseInt(val, 10);
+      return isNaN(n) || n < 0 ? 0 : n;
+    }
+
+    function computeStats(rawShift) {
+      const m = {
+        done: toNum(rawShift.maintenance?.done),
+        canceled: toNum(rawShift.maintenance?.canceled),
+        postponed: toNum(rawShift.maintenance?.postponed)
+      };
+      m.total = m.done + m.canceled + m.postponed;
+
+      const i = {
+        done: toNum(rawShift.install?.done),
+        canceled: toNum(rawShift.install?.canceled),
+        postponed: toNum(rawShift.install?.postponed)
+      };
+      i.total = i.done + i.canceled + i.postponed;
+
+      const r = {
+        done: toNum(rawShift.renewal?.done),
+        canceled: toNum(rawShift.renewal?.canceled),
+        postponed: toNum(rawShift.renewal?.postponed)
+      };
+      r.total = r.done + r.canceled + r.postponed;
+
+      const quality = toNum(rawShift.quality);
+      const clearance = toNum(rawShift.clearance);
+
+      const totalDone = m.done + i.done + r.done;
+      const totalCanceled = m.canceled + i.canceled + r.canceled;
+      const totalPostponed = m.postponed + i.postponed + r.postponed;
+      const grandTotal = m.total + i.total + r.total + quality + clearance;
+
+      return {
+        maintenance: m,
+        install: i,
+        renewal: r,
+        quality,
+        clearance,
+        totalDone,
+        totalCanceled,
+        totalPostponed,
+        grandTotal
+      };
+    }
+
+    function mergeTwoShifts(morningRaw, eveningRaw) {
+      const a = computeStats(morningRaw);
+      const b = computeStats(eveningRaw);
+      return computeStats({
+        maintenance: {
+          done: a.maintenance.done + b.maintenance.done,
+          canceled: a.maintenance.canceled + b.maintenance.canceled,
+          postponed: a.maintenance.postponed + b.maintenance.postponed
+        },
+        install: {
+          done: a.install.done + b.install.done,
+          canceled: a.install.canceled + b.install.canceled,
+          postponed: a.install.postponed + b.install.postponed
+        },
+        renewal: {
+          done: a.renewal.done + b.renewal.done,
+          canceled: a.renewal.canceled + b.renewal.canceled,
+          postponed: a.renewal.postponed + b.renewal.postponed
+        },
+        quality: a.quality + b.quality,
+        clearance: a.clearance + b.clearance
+      });
+    }
+
+    function readInputsIntoShift(shiftName) {
+      if (shiftName !== 'صباحي' && shiftName !== 'مسائي') return;
+      const data = createEmptyShiftData();
+      ['maintenance', 'install', 'renewal'].forEach(g => {
+        data[g].done = toNum(document.querySelector(`[data-group="${g}"][data-type="done"]`).value);
+        data[g].canceled = toNum(document.querySelector(`[data-group="${g}"][data-type="canceled"]`).value);
+        data[g].postponed = toNum(document.querySelector(`[data-group="${g}"][data-type="postponed"]`).value);
+      });
+      data.quality = toNum(qualityEl.value);
+      data.clearance = toNum(clearanceEl.value);
+      shiftsStore[shiftName] = data;
+    }
+
+    function renderActiveShiftToUI() {
+      const currentShift = shiftEl.value;
+      const isMerged = currentShift === 'صباحي مع مسائي';
+
+      const stats = isMerged
+        ? mergeTwoShifts(shiftsStore['صباحي'], shiftsStore['مسائي'])
+        : computeStats(shiftsStore[currentShift]);
+
+      mergedBanner.classList.toggle('show', isMerged);
+
+      ['maintenance', 'install', 'renewal'].forEach(g => {
+        const doneEl = document.querySelector(`[data-group="${g}"][data-type="done"]`);
+        const canceledEl = document.querySelector(`[data-group="${g}"][data-type="canceled"]`);
+        const postponedEl = document.querySelector(`[data-group="${g}"][data-type="postponed"]`);
+
+        doneEl.value = stats[g].done;
+        canceledEl.value = stats[g].canceled;
+        postponedEl.value = stats[g].postponed;
+
+        doneEl.readOnly = isMerged;
+        canceledEl.readOnly = isMerged;
+        postponedEl.readOnly = isMerged;
+
+        document.getElementById(`total-${g}`).textContent = stats[g].total;
+      });
+
+      qualityEl.value = stats.quality;
+      clearanceEl.value = stats.clearance;
+      qualityEl.readOnly = isMerged;
+      clearanceEl.readOnly = isMerged;
+
+      document.getElementById('total-quality').textContent = stats.quality;
+      document.getElementById('total-clearance').textContent = stats.clearance;
+
+      document.getElementById('sum-done').textContent = stats.totalDone;
+      document.getElementById('sum-canceled').textContent = stats.totalCanceled;
+      document.getElementById('sum-postponed').textContent = stats.totalPostponed;
+      document.getElementById('sum-other').textContent = stats.quality + stats.clearance;
+      document.getElementById('grand-total').textContent = stats.grandTotal;
+
+      const mStats = computeStats(shiftsStore['صباحي']);
+      const eStats = computeStats(shiftsStore['مسائي']);
+      document.getElementById('morning-grand').textContent = mStats.grandTotal;
+      document.getElementById('evening-grand').textContent = eStats.grandTotal;
+      document.getElementById('combined-grand').textContent = mStats.grandTotal + eStats.grandTotal;
+    }
+
+    function switchShift(targetShift) {
+      shiftEl.value = targetShift;
+      renderActiveShiftToUI();
+      saveDraft();
+    }
+
+    dateEl.addEventListener('change', () => {
+      if (dateEl.value) {
+        const d = new Date(dateEl.value + 'T00:00:00');
+        if (!isNaN(d.getTime())) {
+          dayEl.value = arabicDays[d.getDay()];
+        }
+      }
+      saveDraft();
+    });
+
+    shiftEl.addEventListener('change', () => {
+      renderActiveShiftToUI();
+      saveDraft();
+    });
+
+    [dayEl, empEl].forEach(el => {
+      el.addEventListener('input', saveDraft);
+      el.addEventListener('change', saveDraft);
+    });
+
+    document.querySelectorAll('.num-input').forEach(input => {
+      input.addEventListener('focus', () => {
+        if (!input.readOnly) input.select();
+      });
+      input.addEventListener('input', () => {
+        if (input.readOnly) return;
+        if (input.value !== '' && parseInt(input.value, 10) < 0) {
+          input.value = 0;
+        }
+        readInputsIntoShift(shiftEl.value);
+        renderActiveShiftToUI();
+        saveDraft();
+      });
+      input.addEventListener('blur', () => {
+        if (input.readOnly) return;
+        if (input.value === '') input.value = 0;
+        readInputsIntoShift(shiftEl.value);
+        renderActiveShiftToUI();
+        saveDraft();
+      });
+    });
+
+    function collectData() {
+      const currentShift = shiftEl.value;
+      const isMerged = currentShift === 'صباحي مع مسائي';
+      const morning = computeStats(shiftsStore['صباحي']);
+      const evening = computeStats(shiftsStore['مسائي']);
+      const activeStats = isMerged
+        ? mergeTwoShifts(shiftsStore['صباحي'], shiftsStore['مسائي'])
+        : computeStats(shiftsStore[currentShift]);
+
+      return {
+        date: dateEl.value,
+        day: dayEl.value,
+        shift: currentShift,
+        isMerged,
+        employee: empEl.value.trim(),
+        ...activeStats,
+        morningData: JSON.parse(JSON.stringify(shiftsStore['صباحي'])),
+        eveningData: JSON.parse(JSON.stringify(shiftsStore['مسائي'])),
+        morningTotal: morning.grandTotal,
+        eveningTotal: evening.grandTotal
+      };
+    }
+
+    function showStatusMsg(msg) {
+      saveBadge.textContent = msg;
+      clearTimeout(window._saveTimer);
+      window._saveTimer = setTimeout(() => {
+        saveBadge.textContent = '💾 محفوظ تلقائياً';
+      }, 2200);
+    }
+
+    function saveDraft() {
+      const payload = {
+        date: dateEl.value,
+        day: dayEl.value,
+        shift: shiftEl.value,
+        employee: empEl.value.trim(),
+        shifts: shiftsStore
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
+      showStatusMsg('✅ تم الحفظ تلقائياً');
+    }
+
+    function loadDraft() {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        try {
+          const data = JSON.parse(raw);
+          if (data.date) dateEl.value = data.date;
+          if (data.day) dayEl.value = data.day;
+          if (data.shift && ['صباحي', 'مسائي', 'صباحي مع مسائي'].includes(data.shift)) {
+            shiftEl.value = data.shift;
+          } else {
+            shiftEl.value = 'صباحي';
+          }
+          empEl.value = data.employee ?? '';
+          if (data.shifts) {
+            shiftsStore['صباحي'] = data.shifts['صباحي'] || createEmptyShiftData();
+            shiftsStore['مسائي'] = data.shifts['مسائي'] || createEmptyShiftData();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        dateEl.value = `${yyyy}-${mm}-${dd}`;
+        dayEl.value = arabicDays[today.getDay()];
+      }
+      renderActiveShiftToUI();
+      updateArchiveCount();
+    }
+
+    function resetAll() {
+      if (!confirm('هل تريد تصفير جميع الأعداد للفترة الصباحية والمسائية واسم الموظف؟')) return;
+      shiftsStore = {
+        'صباحي': createEmptyShiftData(),
+        'مسائي': createEmptyShiftData()
+      };
+      empEl.value = '';
+      renderActiveShiftToUI();
+      saveDraft();
+    }
+
+    // ==================== الأرشيف ====================
+    function getArchive() {
+      try {
+        return JSON.parse(localStorage.getItem(ARCHIVE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function setArchive(list) {
+      localStorage.setItem(ARCHIVE_KEY, JSON.stringify(list));
+      updateArchiveCount();
+    }
+
+    function updateArchiveCount() {
+      document.getElementById('archiveCount').textContent = getArchive().length;
+    }
+
+    function upsertArchiveRecord(d) {
+      const archive = getArchive();
+      const top = archive[0];
+      const isDuplicateTop = top &&
+        top.date === d.date &&
+        top.shift === d.shift &&
+        top.employee === d.employee &&
+        top.grandTotal === d.grandTotal &&
+        top.totalDone === d.totalDone &&
+        top.totalCanceled === d.totalCanceled &&
+        top.totalPostponed === d.totalPostponed;
+
+      if (isDuplicateTop) {
+        top.savedAt = new Date().toLocaleString('ar-EG');
+        setArchive(archive);
+      } else {
+        const record = {
+          ...d,
+          id: Date.now().toString(),
+          savedAt: new Date().toLocaleString('ar-EG')
+        };
+        archive.unshift(record);
+        setArchive(archive);
+      }
+    }
+
+    function saveToArchive() {
+      const d = collectData();
+      upsertArchiveRecord(d);
+      alert(`تم حفظ تقرير "${d.employee || 'بدون اسم'}" (${d.shift}) بتاريخ (${d.date || '-'}) في الأرشيف ✅`);
+    }
+
+    function openArchiveModal() {
+      renderArchiveList();
+      document.getElementById('archiveModal').classList.add('open');
+    }
+
+    function closeArchiveModal() {
+      document.getElementById('archiveModal').classList.remove('open');
+    }
+
+    function renderArchiveList() {
+      const listEl = document.getElementById('archiveList');
+      const query = (document.getElementById('archiveSearch').value || '').trim().toLowerCase();
+      const archive = getArchive();
+
+      const filtered = archive.filter(item => {
+        const emp = (item.employee || '').toLowerCase();
+        const dt = (item.date || '').toLowerCase();
+        const day = (item.day || '').toLowerCase();
+        const sh = (item.shift || '').toLowerCase();
+        return emp.includes(query) || dt.includes(query) || day.includes(query) || sh.includes(query);
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<div class="empty-archive">لا توجد تقارير محفوظة في الأرشيف حالياً.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(item => `
+        <div class="archive-item">
+          <div class="archive-item-top">
+            <div>
+              <div class="archive-meta">👤 ${escapeHtml(item.employee || 'موظف غير محدد')}</div>
+              <div class="archive-sub">📅 ${escapeHtml(item.date || '-')} | ${escapeHtml(item.day)} | 🕒 ${escapeHtml(item.shift)}</div>
+              <div class="archive-sub">منجزة: ${item.totalDone} • ملغية: ${item.totalCanceled} • مؤجلة: ${item.totalPostponed} • الجودة/التصفية: ${(item.quality || 0) + (item.clearance || 0)}</div>
+            </div>
+            <span class="archive-badge">الإجمالي: ${item.grandTotal}</span>
+          </div>
+          <div class="archive-item-actions">
+            <button class="mini-btn mini-load" onclick="loadFromArchive('${item.id}')">📂 فتح في النموذج</button>
+            <button class="mini-btn mini-pdf" onclick="exportArchiveItemPDF('${item.id}')">📄 PDF</button>
+            <button class="mini-btn mini-excel" onclick="exportArchiveItemExcel('${item.id}')">📊 Excel</button>
+            <button class="mini-btn mini-text" onclick="previewArchiveText('${item.id}')">📝 نصية</button>
+            <button class="mini-btn mini-del" onclick="deleteFromArchive('${item.id}')">🗑️ حذف</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function applyRecordToForm(item) {
+      if (item.date) dateEl.value = item.date;
+      if (item.day) dayEl.value = item.day;
+      empEl.value = item.employee ?? '';
+
+      const validShift = ['صباحي', 'مسائي', 'صباحي مع مسائي'].includes(item.shift) ? item.shift : 'صباحي';
+      shiftEl.value = validShift;
+
+      if (item.morningData && item.eveningData) {
+        shiftsStore['صباحي'] = item.morningData;
+        shiftsStore['مسائي'] = item.eveningData;
+      } else {
+        const single = {
+          maintenance: item.maintenance || { done: 0, canceled: 0, postponed: 0 },
+          install: item.install || { done: 0, canceled: 0, postponed: 0 },
+          renewal: item.renewal || { done: 0, canceled: 0, postponed: 0 },
+          quality: item.quality || 0,
+          clearance: item.clearance || 0
+        };
+        if (validShift === 'مسائي') {
+          shiftsStore['مسائي'] = single;
+          shiftsStore['صباحي'] = createEmptyShiftData();
+        } else {
+          shiftsStore['صباحي'] = single;
+          shiftsStore['مسائي'] = createEmptyShiftData();
+        }
+      }
+
+      renderActiveShiftToUI();
+      saveDraft();
+    }
+
+    function loadFromArchive(id) {
+      const item = getArchive().find(r => r.id === id);
+      if (!item) return;
+      applyRecordToForm(item);
+      closeArchiveModal();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function exportArchiveItemPDF(id) {
+      const item = getArchive().find(r => r.id === id);
+      if (!item) return;
+      downloadReportPDF(item);
+    }
+
+    function exportArchiveItemExcel(id) {
+      const item = getArchive().find(r => r.id === id);
+      if (!item) return;
+      downloadSingleReportExcel(item);
+    }
+
+    function previewArchiveText(id) {
+      const item = getArchive().find(r => r.id === id);
+      if (!item) return;
+      document.getElementById('textReportPreview').value = formatTextReport(item);
+      document.getElementById('textModal').classList.add('open');
+    }
+
+    function deleteFromArchive(id) {
+      if (!confirm('هل تريد حذف هذا التقرير من الأرشيف؟')) return;
+      const updated = getArchive().filter(r => r.id !== id);
+      setArchive(updated);
+      renderArchiveList();
+    }
+
+    // ==================== الرسالة النصية ====================
+    function formatTextReport(d) {
+      const mergedLine = d.isMerged || d.shift === 'صباحي مع مسائي'
+        ? `\n☀️ إجمالي الصباحي: ${d.morningTotal ?? '-'} | 🌆 إجمالي المسائي: ${d.eveningTotal ?? '-'}`
+        : '';
+
+      return `📋 تقرير المهام اليومي
+📅 التاريخ: ${d.date || 'غير محدد'}
+📆 اليوم: ${d.day}
+🕒 الفترة: ${d.shift}
+👤 الموظف: ${d.employee || 'غير محدد'}
+━━━━━━━━━━━━━━━
+🔧 مهام الصيانة (العدد الكلي: ${d.maintenance.total})
+• منجزة: ${d.maintenance.done} | ملغية: ${d.maintenance.canceled} | مؤجلة: ${d.maintenance.postponed}
+
+🏗️ مهام النصب (العدد الكلي: ${d.install.total})
+• منجزة: ${d.install.done} | ملغية: ${d.install.canceled} | مؤجلة: ${d.install.postponed}
+
+🔄 مهام طلبات التجديد (العدد الكلي: ${d.renewal.total})
+• منجزة: ${d.renewal.done} | ملغية: ${d.renewal.canceled} | مؤجلة: ${d.renewal.postponed}
+
+✅ مهام الجودة: ${d.quality}
+📦 مهام التصفية: ${d.clearance}
+━━━━━━━━━━━━━━━
+📊 ملخص الإجمالي العام:
+• إجمالي المنجزة: ${d.totalDone}
+• إجمالي الملغية: ${d.totalCanceled}
+• إجمالي المؤجلة: ${d.totalPostponed}${mergedLine}
+🏆 المجموع الكلي لجميع المهام: ${d.grandTotal}`;
+    }
+
+    function openTextModal() {
+      document.getElementById('textReportPreview').value = formatTextReport(collectData());
+      document.getElementById('textModal').classList.add('open');
+    }
+
+    function closeTextModal() {
+      document.getElementById('textModal').classList.remove('open');
+    }
+
+    async function copyTextReport() {
+      const txt = document.getElementById('textReportPreview').value;
+      try {
+        await navigator.clipboard.writeText(txt);
+        alert('تم نسخ الرسالة النصية بنجاح ✅');
+      } catch {
+        const area = document.getElementById('textReportPreview');
+        area.select();
+        document.execCommand('copy');
+        alert('تم نسخ الرسالة النصية ✅');
+      }
+    }
+
+    function sendWhatsApp() {
+      const txt = encodeURIComponent(document.getElementById('textReportPreview').value);
+      window.open(`https://wa.me/?text=${txt}`, '_blank');
+    }
+
+    function downloadTxt() {
+      const d = collectData();
+      const blob = new Blob([document.getElementById('textReportPreview').value], { type: 'text/plain;charset=utf-8' });
+      triggerDownload(blob, `تقرير_المهام_${d.date || 'اليوم'}.txt`);
+    }
+
+    // ==================== محرك Excel (.xlsx) متكامل ====================
+    const CRC_TABLE = (() => {
+      const t = new Uint32Array(256);
+      for (let i = 0; i < 256; i++) {
+        let c = i;
+        for (let k = 0; k < 8; k++) {
+          c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        }
+        t[i] = c >>> 0;
+      }
+      return t;
+    })();
+
+    function crc32(bytes) {
+      let c = 0xFFFFFFFF;
+      for (let i = 0; i < bytes.length; i++) {
+        c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+      }
+      return (c ^ 0xFFFFFFFF) >>> 0;
+    }
+
+    function buildZip(entries) {
+      const encoder = new TextEncoder();
+      const localChunks = [];
+      const centralChunks = [];
+      let offset = 0;
+
+      entries.forEach(entry => {
+        const nameBytes = encoder.encode(entry.name);
+        const dataBytes = encoder.encode(entry.content);
+        const crc = crc32(dataBytes);
+
+        const lh = new Uint8Array(30 + nameBytes.length);
+        const ldv = new DataView(lh.buffer);
+        ldv.setUint32(0, 0x04034b50, true);
+        ldv.setUint16(4, 20, true);
+        ldv.setUint16(6, 0x0800, true);
+        ldv.setUint16(8, 0, true);
+        ldv.setUint32(14, crc, true);
+        ldv.setUint32(18, dataBytes.length, true);
+        ldv.setUint32(22, dataBytes.length, true);
+        ldv.setUint16(26, nameBytes.length, true);
+        lh.set(nameBytes, 30);
+
+        localChunks.push(lh, dataBytes);
+
+        const ch = new Uint8Array(46 + nameBytes.length);
+        const cdv = new DataView(ch.buffer);
+        cdv.setUint32(0, 0x02014b50, true);
+        cdv.setUint16(4, 20, true);
+        cdv.setUint16(6, 20, true);
+        cdv.setUint16(8, 0x0800, true);
+        cdv.setUint16(10, 0, true);
+        cdv.setUint32(16, crc, true);
+        cdv.setUint32(20, dataBytes.length, true);
+        cdv.setUint32(24, dataBytes.length, true);
+        cdv.setUint16(28, nameBytes.length, true);
+        cdv.setUint32(42, offset, true);
+        ch.set(nameBytes, 46);
+
+        centralChunks.push(ch);
+        offset += lh.length + dataBytes.length;
+      });
+
+      const cdSize = centralChunks.reduce((sum, c) => sum + c.length, 0);
+      const eocd = new Uint8Array(22);
+      const edv = new DataView(eocd.buffer);
+      edv.setUint32(0, 0x06054b50, true);
+      edv.setUint16(8, entries.length, true);
+      edv.setUint16(10, entries.length, true);
+      edv.setUint32(12, cdSize, true);
+      edv.setUint32(16, offset, true);
+
+      return new Blob([...localChunks, ...centralChunks, eocd], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+    }
+
+    function escapeXml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function colLetter(idx) {
+      let s = '';
+      let n = idx + 1;
+      while (n > 0) {
+        const rem = (n - 1) % 26;
+        s = String.fromCharCode(65 + rem) + s;
+        n = Math.floor((n - 1) / 26);
+      }
+      return s;
+    }
+
+    function rowsToSheetXml(rows) {
+      const sheetRows = rows.map((row, rIdx) => {
+        if (!row || row.length === 0) return `<row r="${rIdx + 1}"/>`;
+        const cells = row.map((val, cIdx) => {
+          const ref = `${colLetter(cIdx)}${rIdx + 1}`;
+          if (typeof val === 'number' && !isNaN(val)) {
+            return `<c r="${ref}" t="n"><v>${val}</v></c>`;
+          }
+          return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(val ?? '')}</t></is></c>`;
+        }).join('');
+        return `<row r="${rIdx + 1}">${cells}</row>`;
+      }).join('');
+
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetViews>
+    <sheetView rightToLeft="1" workbookViewId="0"/>
+  </sheetViews>
+  <cols>
+    <col min="1" max="1" width="24" customWidth="1"/>
+    <col min="2" max="20" width="15" customWidth="1"/>
+  </cols>
+  <sheetData>${sheetRows}</sheetData>
+</worksheet>`;
+    }
+
+    function createOfflineXlsxBlob(sheetName, rows) {
+      const files = [
+        {
+          name: '[Content_Types].xml',
+          content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`
+        },
+        {
+          name: '_rels/.rels',
+          content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`
+        },
+        {
+          name: 'xl/workbook.xml',
+          content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="${escapeXml(sheetName)}" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>`
+        },
+        {
+          name: 'xl/_rels/workbook.xml.rels',
+          content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`
+        },
+        {
+          name: 'xl/styles.xml',
+          content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="1"><font><sz val="11"/><name val="Arial"/></font></fonts>
+  <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
+  <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/></cellXfs>
+</styleSheet>`
+        },
+        {
+          name: 'xl/worksheets/sheet1.xml',
+          content: rowsToSheetXml(rows)
+        }
+      ];
+
+      return buildZip(files);
+    }
+
+    function triggerDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        a.remove();
+        URL.revokeObjectURL(url);
+      }, 10000);
+    }
+
+    function writeExcelFile(sheetName, rows, filename) {
+      if (typeof XLSX !== 'undefined') {
+        try {
+          const ws = XLSX.utils.aoa_to_sheet(rows);
+          ws['!cols'] = [
+            { wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+            { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
+            { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }
+          ];
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, sheetName);
+          if (!wb.Workbook) wb.Workbook = {};
+          wb.Workbook.Views = [{ RTL: true }];
+          XLSX.writeFile(wb, filename);
+          return;
+        } catch (err) {
+          console.warn('Fallback to offline XLSX builder:', err);
+        }
+      }
+      const blob = createOfflineXlsxBlob(sheetName, rows);
+      triggerDownload(blob, filename);
+    }
+
+    function downloadSingleReportExcel(d) {
+      const mRaw = d.morningData || createEmptyShiftData();
+      const eRaw = d.eveningData || createEmptyShiftData();
+
+      const rows = [
+        ['تقرير المهام اليومي'],
+        ['التاريخ', d.date || '-', 'اليوم', d.day],
+        ['الفترة', d.shift, 'اسم الموظف', d.employee || '-'],
+        [],
+        ['القسم', 'منجزة', 'ملغية', 'مؤجلة', 'العدد الكلي'],
+        ['مهام الصيانة', d.maintenance.done, d.maintenance.canceled, d.maintenance.postponed, d.maintenance.total],
+        ['مهام النصب', d.install.done, d.install.canceled, d.install.postponed, d.install.total],
+        ['مهام طلبات التجديد', d.renewal.done, d.renewal.canceled, d.renewal.postponed, d.renewal.total],
+        ['مهام الجودة', '-', '-', '-', d.quality],
+        ['مهام التصفية', '-', '-', '-', d.clearance],
+        [],
+        ['المجموع الكلي العام', d.totalDone, d.totalCanceled, d.totalPostponed, d.grandTotal]
+      ];
+
+      if (d.isMerged || d.shift === 'صباحي مع مسائي') {
+        const m = computeStats(mRaw);
+        const e = computeStats(eRaw);
+        rows.push(
+          [],
+          ['تفصيل الفترتين المدمجتين'],
+          ['الفترة', 'منجزة', 'ملغية', 'مؤجلة', 'الجودة + التصفية', 'الإجمالي'],
+          ['صباحي', m.totalDone, m.totalCanceled, m.totalPostponed, m.quality + m.clearance, m.grandTotal],
+          ['مسائي', e.totalDone, e.totalCanceled, e.totalPostponed, e.quality + e.clearance, e.grandTotal],
+          ['المجموع المدمج', d.totalDone, d.totalCanceled, d.totalPostponed, d.quality + d.clearance, d.grandTotal]
+        );
+      }
+
+      const safeEmp = d.employee ? `_${d.employee.replace(/[\\/:*?"<>|]/g, '')}` : '';
+      const safeDate = (d.date || 'اليوم').replace(/[\\/:*?"<>|]/g, '-');
+      writeExcelFile('تقرير المهام', rows, `تقرير_المهام_${safeDate}${safeEmp}.xlsx`);
+    }
+
+    function saveAndExportExcel() {
+      saveDraft();
+      const d = collectData();
+      upsertArchiveRecord(d);
+      downloadSingleReportExcel(d);
+      showStatusMsg('✅ تم حفظ التقرير وتنزيل Excel');
+    }
+
+    function exportAllArchiveExcel() {
+      const archive = getArchive();
+      if (archive.length === 0) {
+        alert('الأرشيف فارغ، احفظ تقريراً أولاً.');
+        return;
+      }
+
+      const rows = [
+        [
+          'التاريخ', 'اليوم', 'الفترة', 'اسم الموظف',
+          'صيانة (منجزة)', 'صيانة (ملغية)', 'صيانة (مؤجلة)', 'صيانة (الكل)',
+          'نصب (منجزة)', 'نصب (ملغية)', 'نصب (مؤجلة)', 'نصب (الكل)',
+          'تجديد (منجزة)', 'تجديد (ملغية)', 'تجديد (مؤجلة)', 'تجديد (الكل)',
+          'الجودة', 'التصفية', 'المجموع الكلي'
+        ]
+      ];
+
+      archive.forEach(d => {
+        rows.push([
+          d.date || '-', d.day, d.shift, d.employee || '-',
+          d.maintenance.done, d.maintenance.canceled, d.maintenance.postponed, d.maintenance.total,
+          d.install.done, d.install.canceled, d.install.postponed, d.install.total,
+          d.renewal.done, d.renewal.canceled, d.renewal.postponed, d.renewal.total,
+          d.quality, d.clearance, d.grandTotal
+        ]);
+      });
+
+      writeExcelFile('أرشيف التقارير', rows, 'أرشيف_التقارير_الشامل.xlsx');
+    }
+
+    // ==================== مولّد PDF مدمج يعمل 100% بدون إنترنت ====================
+    function drawRoundedRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function asciiToBytes(str) {
+      const arr = new Uint8Array(str.length);
+      for (let i = 0; i < str.length; i++) {
+        arr[i] = str.charCodeAt(i) & 0xFF;
+      }
+      return arr;
+    }
+
+    function buildPdfBlobFromJpeg(jpgBytes, imgW, imgH) {
+      const chunks = [];
+      let pos = 0;
+      const offsets = [0];
+
+      function pushBytes(arr) {
+        chunks.push(arr);
+        pos += arr.length;
+      }
+
+      pushBytes(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34, 0x0A, 0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A]));
+
+      offsets[1] = pos;
+      pushBytes(asciiToBytes('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'));
+
+      offsets[2] = pos;
+      pushBytes(asciiToBytes('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n'));
+
+      offsets[3] = pos;
+      pushBytes(asciiToBytes('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n'));
+
+      offsets[4] = pos;
+      pushBytes(asciiToBytes(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imgW} /Height ${imgH} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpgBytes.length} >>\nstream\n`));
+      pushBytes(jpgBytes);
+      pushBytes(asciiToBytes('\nendstream\nendobj\n'));
+
+      const contentStream = 'q\n595 0 0 842 0 0 cm\n/Im0 Do\nQ\n';
+      offsets[5] = pos;
+      pushBytes(asciiToBytes(`5 0 obj\n<< /Length ${contentStream.length} >>\nstream\n${contentStream}endstream\nendobj\n`));
+
+      const xrefStart = pos;
+      let xref = 'xref\n0 6\n0000000000 65535 f \n';
+      for (let i = 1; i <= 5; i++) {
+        xref += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+      }
+      xref += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+      pushBytes(asciiToBytes(xref));
+
+      return new Blob(chunks, { type: 'application/pdf' });
+    }
+
+    async function renderReportToPdfBlob(d) {
+      if (document.fonts && document.fonts.ready) {
+        try { await document.fonts.ready; } catch {}
+      }
+
+      const W = 1240;
+      const H = 1754;
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      ctx.direction = 'rtl';
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.strokeStyle = '#dbeafe';
+      ctx.lineWidth = 4;
+      drawRoundedRect(ctx, 40, 40, W - 80, H - 80, 24);
+      ctx.stroke();
+
+      ctx.fillStyle = '#1449c7';
+      drawRoundedRect(ctx, 64, 64, W - 128, 190, 18);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.font = '800 38px Cairo, Tahoma, Arial, sans-serif';
+      ctx.fillText('تقرير المهام اليومي', W - 96, 122);
+
+      ctx.font = '700 22px Cairo, Tahoma, Arial, sans-serif';
+      const metaY1 = 180;
+      const metaY2 = 220;
+      ctx.fillText(`التاريخ: ${d.date || '-'}`, W - 96, metaY1);
+      ctx.fillText(`اليوم: ${d.day || '-'}`, W - 540, metaY1);
+      ctx.fillText(`الفترة: ${d.shift || '-'}`, W - 96, metaY2);
+      ctx.fillText(`الموظف: ${d.employee || 'غير محدد'}`, W - 540, metaY2);
+
+      const tableX = 64;
+      const tableY = 290;
+      const colWidths = [185, 185, 185, 185, 372];
+      const totalW = colWidths.reduce((a, b) => a + b, 0);
+      const rowH = 88;
+
+      const colCenters = [];
+      let curX = tableX;
+      for (let c = 0; c < colWidths.length; c++) {
+        colCenters.push(curX + colWidths[c] / 2);
+        curX += colWidths[c];
+      }
+
+      ctx.fillStyle = '#f3f4f6';
+      ctx.fillRect(tableX, tableY, totalW, rowH);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(tableX, tableY, totalW, rowH);
+
+      const headers = [
+        { text: 'العدد الكلي', color: '#111827' },
+        { text: 'مؤجلة', color: '#d97706' },
+        { text: 'ملغية', color: '#dc2626' },
+        { text: 'منجزة', color: '#0f7640' },
+        { text: 'القسم', color: '#111827' }
+      ];
+
+      ctx.font = '800 23px Cairo, Tahoma, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      headers.forEach((h, idx) => {
+        ctx.fillStyle = h.color;
+        ctx.fillText(h.text, colCenters[idx], tableY + rowH / 2);
+      });
+
+      let sepX = tableX;
+      for (let c = 0; c < colWidths.length - 1; c++) {
+        sepX += colWidths[c];
+        ctx.beginPath();
+        ctx.moveTo(sepX, tableY);
+        ctx.lineTo(sepX, tableY + rowH);
+        ctx.stroke();
+      }
+
+      const tableRows = [
+        {
+          name: 'مهام الصيانة',
+          done: d.maintenance.done,
+          canceled: d.maintenance.canceled,
+          postponed: d.maintenance.postponed,
+          total: d.maintenance.total
+        },
+        {
+          name: 'مهام النصب',
+          done: d.install.done,
+          canceled: d.install.canceled,
+          postponed: d.install.postponed,
+          total: d.install.total
+        },
+        {
+          name: 'مهام طلبات التجديد',
+          done: d.renewal.done,
+          canceled: d.renewal.canceled,
+          postponed: d.renewal.postponed,
+          total: d.renewal.total
+        },
+        {
+          name: 'مهام الجودة',
+          done: '-',
+          canceled: '-',
+          postponed: '-',
+          total: d.quality
+        },
+        {
+          name: 'مهام التصفية',
+          done: '-',
+          canceled: '-',
+          postponed: '-',
+          total: d.clearance
+        }
+      ];
+
+      tableRows.forEach((r, rIdx) => {
+        const y = tableY + rowH * (rIdx + 1);
+        ctx.fillStyle = rIdx % 2 === 1 ? '#f9fafb' : '#ffffff';
+        ctx.fillRect(tableX, y, totalW, rowH);
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.strokeRect(tableX, y, totalW, rowH);
+
+        let lx = tableX;
+        for (let c = 0; c < colWidths.length - 1; c++) {
+          lx += colWidths[c];
+          ctx.beginPath();
+          ctx.moveTo(lx, y);
+          ctx.lineTo(lx, y + rowH);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = '#111827';
+        ctx.textAlign = 'right';
+        ctx.font = '700 22px Cairo, Tahoma, Arial, sans-serif';
+        ctx.fillText(r.name, tableX + totalW - 24, y + rowH / 2);
+
+        ctx.textAlign = 'center';
+        ctx.font = '700 24px Cairo, Tahoma, Arial, sans-serif';
+        ctx.fillStyle = '#0f7640';
+        ctx.fillText(String(r.done), colCenters[3], y + rowH / 2);
+        ctx.fillStyle = '#dc2626';
+        ctx.fillText(String(r.canceled), colCenters[2], y + rowH / 2);
+        ctx.fillStyle = '#d97706';
+        ctx.fillText(String(r.postponed), colCenters[1], y + rowH / 2);
+        ctx.fillStyle = '#111827';
+        ctx.font = '800 25px Cairo, Tahoma, Arial, sans-serif';
+        ctx.fillText(String(r.total), colCenters[0], y + rowH / 2);
+      });
+
+      const footY = tableY + rowH * (tableRows.length + 1);
+      ctx.fillStyle = '#eff6ff';
+      ctx.fillRect(tableX, footY, totalW, rowH);
+      ctx.strokeStyle = '#93c5fd';
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(tableX, footY, totalW, rowH);
+
+      let fx = tableX;
+      for (let c = 0; c < colWidths.length - 1; c++) {
+        fx += colWidths[c];
+        ctx.beginPath();
+        ctx.moveTo(fx, footY);
+        ctx.lineTo(fx, footY + rowH);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#1449c7';
+      ctx.textAlign = 'right';
+      ctx.font = '800 23px Cairo, Tahoma, Arial, sans-serif';
+      ctx.fillText('المجموع الكلي العام', tableX + totalW - 24, footY + rowH / 2);
+
+      ctx.textAlign = 'center';
+      ctx.font = '800 25px Cairo, Tahoma, Arial, sans-serif';
+      ctx.fillStyle = '#0f7640';
+      ctx.fillText(String(d.totalDone), colCenters[3], footY + rowH / 2);
+      ctx.fillStyle = '#dc2626';
+      ctx.fillText(String(d.totalCanceled), colCenters[2], footY + rowH / 2);
+      ctx.fillStyle = '#d97706';
+      ctx.fillText(String(d.totalPostponed), colCenters[1], footY + rowH / 2);
+      ctx.fillStyle = '#1449c7';
+      ctx.font = '800 28px Cairo, Tahoma, Arial, sans-serif';
+      ctx.fillText(String(d.grandTotal), colCenters[0], footY + rowH / 2);
+
+      const cardsY = footY + rowH + 45;
+      const cardGap = 18;
+      const cardW = (totalW - cardGap * 3) / 4;
+      const cardH = 130;
+
+      const summaryCards = [
+        { label: 'الجودة + التصفية', val: d.quality + d.clearance, color: '#1449c7' },
+        { label: 'إجمالي المؤجلة', val: d.totalPostponed, color: '#d97706' },
+        { label: 'إجمالي الملغية', val: d.totalCanceled, color: '#dc2626' },
+        { label: 'إجمالي المنجزة', val: d.totalDone, color: '#0f7640' }
+      ];
+
+      summaryCards.forEach((sc, idx) => {
+        const cx = tableX + idx * (cardW + cardGap);
+        ctx.fillStyle = '#f8fafc';
+        drawRoundedRect(ctx, cx, cardsY, cardW, cardH, 14);
+        ctx.fill();
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#475569';
+        ctx.font = '700 20px Cairo, Tahoma, Arial, sans-serif';
+        ctx.fillText(sc.label, cx + cardW / 2, cardsY + 42);
+
+        ctx.fillStyle = sc.color;
+        ctx.font = '800 36px Cairo, Tahoma, Arial, sans-serif';
+        ctx.fillText(String(sc.val), cx + cardW / 2, cardsY + 92);
+      });
+
+      let nextY = cardsY + cardH + 36;
+      if (d.isMerged || d.shift === 'صباحي مع مسائي') {
+        ctx.fillStyle = '#eff6ff';
+        drawRoundedRect(ctx, tableX, nextY, totalW, 90, 14);
+        ctx.fill();
+        ctx.strokeStyle = '#bfdbfe';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#1e3a8a';
+        ctx.font = '700 22px Cairo, Tahoma, Arial, sans-serif';
+        ctx.fillText(
+          `تفصيل الدمج: إجمالي الصباحي (${d.morningTotal ?? '-'})  +  إجمالي المسائي (${d.eveningTotal ?? '-'})  =  المجموع الكلي (${d.grandTotal})`,
+          tableX + totalW / 2,
+          nextY + 45
+        );
+      }
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#64748b';
+      ctx.font = '600 18px Cairo, Tahoma, Arial, sans-serif';
+      ctx.fillText(`تم إنشاء التقرير بتاريخ: ${new Date().toLocaleString('ar-EG')}`, W / 2, H - 85);
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      const binStr = atob(dataUrl.split(',')[1]);
+      const jpgBytes = new Uint8Array(binStr.length);
+      for (let i = 0; i < binStr.length; i++) {
+        jpgBytes[i] = binStr.charCodeAt(i);
+      }
+
+      return buildPdfBlobFromJpeg(jpgBytes, W, H);
+    }
+
+    async function downloadReportPDF(d) {
+      try {
+        showStatusMsg('⏳ جاري تجهيز ملف PDF...');
+        const pdfBlob = await renderReportToPdfBlob(d);
+        const safeEmp = d.employee ? `_${d.employee.replace(/[\\/:*?"<>|]/g, '')}` : '';
+        const safeDate = (d.date || 'اليوم').replace(/[\\/:*?"<>|]/g, '-');
+        triggerDownload(pdfBlob, `تقرير_المهام_${safeDate}${safeEmp}.pdf`);
+        showStatusMsg('✅ تم حفظ التقرير وتنزيل PDF');
+      } catch (err) {
+        console.error(err);
+        alert('حدث خطأ أثناء إنشاء ملف PDF.');
+      }
+    }
+
+    async function saveAndExportPDF() {
+      saveDraft();
+      const d = collectData();
+      upsertArchiveRecord(d);
+      await downloadReportPDF(d);
+    }
+
+    loadDraft();
+  </script>
+</body>
+</html>
